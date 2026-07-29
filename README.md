@@ -72,8 +72,7 @@ python3 --version
 You can download the project as a ZIP file from GitHub or clone the repository using Git:
 
 ```bash
-git clone <YOUR-REPOSITORY-URL>
-```
+git clone https://github.com/sagarpani/TubeShelf.git
 
 ### 2. Open the project folder
 
