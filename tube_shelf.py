@@ -52,21 +52,39 @@ def is_valid_youtube_url(url: str) -> bool:
     )
     return parsed.scheme in ("http", "https") and parsed.netloc in valid_domains
 
-def open_video(videos: list[dict[str, str]]) -> None:
-    if not videos:
-        print("\nNo videos available.")
+def open_video(conn: sqlite3.Connection) -> None:
+    
+    cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
+    if cursor_video.fetchone() is None:
+        print("\nNo videos found to open.")
+        return      
+    
+    list_all_videos(conn)
+    
+    while True:
+        try:
+            video_id = int(input("\nEnter video number to open: "))
+
+            if is_valid_video_id(conn, video_id):
+                break
+            
+        except ValueError:
+            print("\nEnter a valid video ID")
+        
+
+    cursor = conn.execute("SELECT link FROM videos WHERE id = ?", (video_id,))
+    result = cursor.fetchone()
+
+    if result is None:
+        print("Video not found.")
         return
 
-    list_all_videos(videos)
-
-    index = get_valid_video_number(videos, "Enter the video number to open: ")
-
-    if index is None:
-        return
+    (link,) = result
+    
 
     print("\nRolling the tape....")
 
-    webbrowser.open(videos[index]["link"])
+    webbrowser.open(link)
 
 
 def list_all_videos(conn: sqlite3.Connection) -> None:
