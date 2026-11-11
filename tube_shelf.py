@@ -1,7 +1,21 @@
+import sqlite3
+from contextlib import closing
+
 import json
 import re
 import webbrowser
 from urllib.parse import urlparse
+
+# new
+def create_database(conn: sqlite3.Connection) -> None:
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS videos(
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            time TEXT NOT NULL,
+            link TEXT NOT NULL
+        )
+    ''')
 
 def is_valid_duration(duration: str) -> bool:
     pattern = r"^(\d{1,2}:\d{2}|\d+:\d{2}:\d{2})$"
@@ -206,50 +220,52 @@ def exit_app():
 
 
 def main()-> None:
-    # Videos hold a list to store data of each video stored inside of the file.
-    videos = load_data()
+    with closing(sqlite3.connect("tubeshelf.db")) as conn:
+        videos = load_data()
 
-    display_welcome()
+        create_database(conn)
 
-    try:
-        while True:
-            display_menu()        
+        display_welcome()
 
-            try:
-                choice = int(input("\nEnter your choice: "))
+        try:
+            while True:
+                display_menu()        
 
-            except ValueError:
-                print("Enter a valid choice(1-6)")
-                continue
+                try:
+                    choice = int(input("\nEnter your choice: "))
+
+                except ValueError:
+                    print("Enter a valid choice(1-6)")
+                    continue
 
 
-            match choice:
-                case 1:
-                    list_all_videos(videos)
+                match choice:
+                    case 1:
+                        list_all_videos(videos)
 
-                case 2:
-                    add_video(videos)
+                    case 2:
+                        add_video(videos)
 
-                case 3:
-                    update_video(videos)
+                    case 3:
+                        update_video(videos)
 
-                case 4:
-                    remove_video(videos)
+                    case 4:
+                        remove_video(videos)
 
-                case 5:
-                    open_video(videos)
+                    case 5:
+                        open_video(videos)
 
-                case 6:
-                    exit_app()
-                    break
-                
-                case _:
-                    print("\nEnter a valid choice(1-6)")
+                    case 6:
+                        exit_app()
+                        break
+                    
+                    case _:
+                        print("\nEnter a valid choice(1-6)")
 
-    except KeyboardInterrupt:
-        print("\n\nEmergency exit initiated.")
-        print("Thanks for using TubeShelf!")
-        print("See you, space cowboy...")
+        except KeyboardInterrupt:
+            print("\n\nEmergency exit initiated.")
+            print("Thanks for using TubeShelf!")
+            print("See you, space cowboy...")
             
 if __name__ == "__main__":
     main()
