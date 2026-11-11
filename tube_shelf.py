@@ -234,8 +234,8 @@ def remove_video(conn: sqlite3.Connection) -> None:
         try:
             video_id = int(input("Enter video number to remove: "))
 
-        except ValueError as e:
-            print(f"Error: {e}")
+        except ValueError:
+            print("Error: Enter a valid video ID.")
         else:
             if is_valid_video_id(conn, video_id):
                 break
