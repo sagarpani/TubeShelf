@@ -5,7 +5,6 @@ import webbrowser
 from urllib.parse import urlparse
 
 
-
 def create_database(conn: sqlite3.Connection) -> None:
     conn.execute('''
         CREATE TABLE IF NOT EXISTS videos(
@@ -160,7 +159,6 @@ def is_valid_video_id(conn: sqlite3.Connection, video_id: int) -> bool:
     return True
             
     
-
 def update_video(conn: sqlite3.Connection) -> None:
 
     cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
@@ -169,7 +167,6 @@ def update_video(conn: sqlite3.Connection) -> None:
         return
 
     
-
     list_all_videos(conn)
 
     while True:
@@ -219,9 +216,7 @@ def update_video(conn: sqlite3.Connection) -> None:
             print("\nVideo updated successfully.")
 
     print("\n" + "-" * 70)
-
-
-        
+      
 
 def remove_video(conn: sqlite3.Connection) -> None:
     cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
