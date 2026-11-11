@@ -27,18 +27,23 @@ The project uses original dialogue and a space-themed interface while paying tri
 * 🚀 Launch videos directly in your default web browser
 * 🔗 Validate YouTube video URLs
 * ⏱️ Validate video durations
-* 💾 Store video data locally using JSON
 * 🔄 Support older records through simple data migration
 * 🛡️ Handle missing and corrupted data files
 * ⌨️ Exit safely using `Ctrl+C`
+* 💾 Store video data locally using SQLite3
+* 🗄️ Manage video records using SQL queries
+* 🔒 Use parameterized queries for safer database operations
+* 🔄 Manage database transactions with commit and rollback
+* 🛡️ Handle database errors and invalid user input
 * 🌌 Enjoy a space-jazz-inspired terminal experience
 
 ---
 
 ## 🛠️ Technologies Used
 
-* Python 3
-* `json`
+* `Python 3`
+* `sqlite3`
+* `contextlib`
 * `re`
 * `webbrowser`
 * `urllib.parse`
@@ -191,7 +196,7 @@ Select the number of the video you want to update, then enter its new:
 * Duration
 * YouTube link
 
-The updated information is automatically saved to the local JSON file.
+The updated information is automatically saved to the local sqlite3 file.
 
 ---
 
@@ -265,13 +270,16 @@ at any time to exit the application safely.
 TubeShelf/
 │
 ├── tubeshelf.py
-├── youtube.json
+├── .gitignore
 └── README.md
 ```
 
 * `tubeshelf.py` — Main application source code
-* `youtube.json` — Stores the saved video library
+* `.gitignore` — Excludes local database and unnecessary files
 * `README.md` — Project documentation
+
+> tubeshelf.db is automatically created when the application runs for the first time.
+It is stored locally and excluded from version control.
 
 > If your Python file has a different name, update the filename in this section and in the run commands above.
 
@@ -279,38 +287,33 @@ TubeShelf/
 
 ## 💾 Data Storage
 
-TubeShelf stores video information locally inside the `youtube.json` file.
+TubeShelf uses SQLite3 to store video information locally in a database named `tubeshelf.db`.
 
-Each video is saved in the following format:
+The database contains a `videos` table with the following structure:
 
-```json
-{
-    "name": "Apocalypse",
-    "time": "4:51",
-    "link": "https://youtu.be/sElE_BfQ67s"
-}
-```
+| Column | Data Type | Constraint |
+|---|---|---|
+| id | INTEGER | PRIMARY KEY |
+| name | TEXT | NOT NULL |
+| time | TEXT | NOT NULL |
+| link | TEXT | NOT NULL |
+
+Video records are managed using SQL queries.
+
+The database is automatically initialized when TubeShelf starts for the first time.
 
 Your video library remains available after closing and reopening the application.
 
 ---
 
-## 🔄 Backward Compatibility
-
-TubeShelf supports older video records through a simple data-migration process.
-
-When existing data is loaded, older records that do not contain a YouTube link are automatically updated with an empty `link` field. This allows older JSON data to continue working after the application's data structure evolves.
-
----
 
 ## ⚠️ Notes
 
 * TubeShelf is a local application. Your video data is stored on your computer.
 * No external Python packages are required.
 * Videos open in the default web browser configured on your operating system.
-* If `youtube.json` does not exist, TubeShelf automatically starts with an empty library.
-* If the JSON data file is corrupted, TubeShelf displays a warning and starts with an empty library.
-* Avoid manually editing `youtube.json` unless you are familiar with JSON syntax.
+* If tubeshelf.db does not exist, TubeShelf automatically creates the database and required table.
+* Database errors are handled by the application.
 
 ---
 
@@ -321,13 +324,15 @@ This project was built to practise and demonstrate:
 * Python functions
 * Type hints
 * File handling
-* JSON data storage
-* CRUD operations
+* SQLite database operations
+* SQL CRUD operations
+* Parameterized queries
+* Database transactions
+* Connection management
 * Exception handling
 * Regular expressions
 * Input validation
 * URL parsing
-* Data migration
 * Python standard-library modules
 * Command-line application design
 * Basic terminal user experience
@@ -342,7 +347,6 @@ Some ideas for future versions include:
 * Add video categories
 * Add favourite videos
 * Sort and filter videos
-* Replace JSON storage with SQLite
 
 ---
 
