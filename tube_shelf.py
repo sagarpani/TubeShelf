@@ -1,7 +1,19 @@
-import json
+import sqlite3
+from contextlib import closing
 import re
 import webbrowser
 from urllib.parse import urlparse
+
+
+def create_database(conn: sqlite3.Connection) -> None:
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS videos(
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            time TEXT NOT NULL,
+            link TEXT NOT NULL
+        )
+    ''')
 
 def is_valid_duration(duration: str) -> bool:
     pattern = r"^(\d{1,2}:\d{2}|\d+:\d{2}:\d{2})$"
@@ -31,41 +43,6 @@ def display_menu() -> None:
     print("6. Leave TubeShelf")
 
 
-def load_data() -> list[dict[str, str]]:
-    try:
-        with open('youtube.json', 'r') as file:
-            videos = json.load(file)
-
-        # data migration: upgrade old records with new format added
-        for video in videos:
-            video.setdefault('link', "")
-
-        return videos
-        
-    except FileNotFoundError:
-        return []
-
-    except json.JSONDecodeError:
-        print("The data file is corrupted. Starting with an empty library.")
-        return []
-        
-def save_data(videos: list[dict[str, str]]) -> None:
-    with open('youtube.json', 'w') as file:
-        json.dump(videos, file, indent=4)
-
-def get_valid_video_number(videos: list[dict[str, str]], prompt: str) -> int | None:
-    try:
-        index = int(input(prompt))
-    except ValueError:
-        print("Enter a valid number.")
-        return None
-    
-    if not 1 <= index <= len(videos):
-        print("invalid video number.")
-        return None
-
-    return index -1
-
 def is_valid_youtube_url(url: str) -> bool:
     parsed = urlparse(url)
     valid_domains = (
@@ -75,130 +52,216 @@ def is_valid_youtube_url(url: str) -> bool:
     )
     return parsed.scheme in ("http", "https") and parsed.netloc in valid_domains
 
-def open_video(videos: list[dict[str, str]]) -> None:
-    if not videos:
-        print("No videos available.")
+def open_video(conn: sqlite3.Connection) -> None:
+    
+    cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
+    if cursor_video.fetchone() is None:
+        print("\nNo videos found to open.")
+        return      
+    
+    list_all_videos(conn)
+    
+    while True:
+        try:
+            video_id = int(input("\nEnter video number to open: "))
+
+            if is_valid_video_id(conn, video_id):
+                break
+            
+        except ValueError:
+            print("\nEnter a valid video ID")
+        
+
+    cursor = conn.execute("SELECT link FROM videos WHERE id = ?", (video_id,))
+    result = cursor.fetchone()
+
+    if result is None:
+        print("Video not found.")
         return
 
-    list_all_videos(videos)
-
-    index = get_valid_video_number(videos, "Enter the video number to open: ")
-
-    if index is None:
-        return
+    (link,) = result
+    
 
     print("\nRolling the tape....")
 
-    webbrowser.open(videos[index]["link"])
+    webbrowser.open(link)
 
-def list_all_videos(videos: list[dict[str, str]]) -> None:
+
+def list_all_videos(conn: sqlite3.Connection) -> None:
     print("\n" + "-" * 70)
+    cursor = conn.execute("SELECT id, name, time, link FROM videos ORDER BY id")
+    videos = cursor.fetchall()
 
     if not videos:
-        print('No videos found. Add your first video!')
+        print('\nNo videos found. Add your first video!')
     else:
-        for index,video in enumerate(videos, start=1):
-            
+        for video_id, name, time, link in videos:
             print(
-                f"{index}. {video['name']}\n"
-                f"   Duration: {video['time']}\n"
-                f"   Link: {video['link']}")
+                    f"{video_id}. {name}\n"
+                    f"   Duration: {time}\n"
+                    f"   Link: {link}"
+                )
 
     print("\n" + '-' * 70)
 
 
-def add_video(videos: list[dict[str, str]]) -> None:
-    name = input("Enter video name: ").strip()
+def add_video(conn: sqlite3.Connection) -> None:
+    while True:
+        name = input("Enter video name: ").strip()
+        if name:
+            break
+        print("\nVideo name cannot be empty.")
 
     while True:
-        time = input("Enter video time: ").strip()
-        if is_valid_duration(time):
+        duration = input("Enter video time: ").strip()
+        if is_valid_duration(duration):
             break
-        print("Please enter time in MM:SS or HH:MM:SS format.")
+        print("\nPlease enter time in MM:SS or HH:MM:SS format.")
+    
     
 
     while True:
         link = input("Enter video link: ").strip() 
         if is_valid_youtube_url(link):
             break
-        print("Please enter a valid YouTube URL.")
+        print("\nPlease enter a valid YouTube URL.")
 
+    data = (name, duration, link)
 
-    if not name or not time or not link:
-        print("Video name or duration cannot be empty.")
-        return
+    try:
+        with conn:
+            conn.execute('''
+                INSERT INTO videos(name, time, link)
+                VALUES(?, ?, ?)
+            ''', data)
 
-    
-    
-    videos.append(
-        {
-            'name': name,
-            'time': time,
-            'link': link
-        }
-    )
-    save_data(videos)
-    print("\nVideo added successfully.")
+    except sqlite3.Error as e:
+        print(f"\nDatabase Error: {e}")
+
+    # will run only when try block is successful
+    else:
+        print("\nVideo added successfully.")    
+
     print("\n" + "-" * 70)
 
-def update_video(videos: list[dict[str, str]]) -> None:
-    if not videos:
-        print("No videos found to update.")
-        return
-    
-    list_all_videos(videos)
-    index = get_valid_video_number(videos, "Enter the video number to update: ")
+def is_valid_video_id(conn: sqlite3.Connection, video_id: int) -> bool:
 
-    if index is None:
+    if video_id <= 0:
+        print("\nVideo id must be a positive number.")
+        return False
+
+        
+    cursor_id = conn.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,))
+    if cursor_id.fetchone() is None:
+        print("\nVideo ID not found.")
+        return False
+
+    return True
+            
+    
+def update_video(conn: sqlite3.Connection) -> None:
+
+    cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
+    if cursor_video.fetchone() is None:
+        print("\nNo videos found to update.")
         return
+
     
-    
-    name = input("Enter the new video name: ").strip()
+    list_all_videos(conn)
 
     while True:
-        time = input("Enter the new video time: ").strip()
-        if is_valid_duration(time):
+        try:
+            video_id = int(input("Enter video number to update: "))
+
+            if is_valid_video_id(conn, video_id):
+                break
+            
+        except ValueError:
+            print("\nEnter a valid video ID")
+
+    while True:
+        name = input("Enter the new video name: ").strip()
+        if name:
             break
-        print("Enter time in a valid format(HH:MM:SS)")
+        print("\nVideo name cannot be empty")
+
+    while True:
+        duration = input("Enter the new video time: ").strip()
+        if is_valid_duration(duration):
+            break
+        print("\nEnter time in a valid format(HH:MM:SS)")
 
     while True:
         link = input("Enter video link: ").strip() 
         if is_valid_youtube_url(link):
             break
-        print("Please enter a valid YouTube URL.")
+        print("\nPlease enter a valid YouTube URL.")
 
-    if not name or not time or not link:
-        print("Video name or duration cannot be empty.")
+    data = (name, duration, link, video_id)
+
+    try:
+        with conn:
+            cursor = conn.execute('''
+                UPDATE videos
+                SET name = ?, time = ?, link = ?
+                WHERE id = ?
+            ''', data)
+
+    except sqlite3.Error as e:
+        print(f"Database Error: {e}")
+    else:
+        if cursor.rowcount == 0:
+            print("\nVideo ID not found")
+        else:
+            print("\nVideo updated successfully.")
+
+    print("\n" + "-" * 70)
+      
+
+def remove_video(conn: sqlite3.Connection) -> None:
+    cursor_video = conn.execute("SELECT 1 FROM videos LIMIT 1")
+    if cursor_video.fetchone() is None:
+        print("\nNo videos found to remove.")
         return
 
-    videos[index] = {
-        'name': name,
-        'time': time,
-        'link': link
-    }
+    list_all_videos(conn)
 
-    save_data(videos)
+    while True:
+        try:
+            video_id = int(input("Enter video number to remove: "))
 
-    print("\nVideo updated successfully.")
+        except ValueError:
+            print("Error: Enter a valid video ID.")
+        else:
+            if is_valid_video_id(conn, video_id):
+                break
 
-def remove_video(videos: list[dict[str, str]]) -> None:
+    while True:
 
-    if not videos:
-        print("No videos found to remove.")
-        return
+        letter = input(f"Confirm delete request of video number {video_id} (y/n): ").strip().lower()
 
-    list_all_videos(videos)
+            
+        if letter == 'y':
+            print(f"Deleting video number {video_id}...")
+            break
 
-    index = get_valid_video_number(videos, "Enter the video number to remove: ")
+        elif letter == 'n':
+            print("Deletion aborted.")
+            return
+        
+        print("Enter a valid response between y and n.")
 
-    if index is None:
-        return
+    try:
+        with conn:
+            cursor = conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+    except sqlite3.Error as e:
+        print(f"\nDatabase Error: {e}")
+    else:
+        if cursor.rowcount == 0:
+            print("\nVideo id not found.")
+        else:   
+            print("\nVideo removed successfully.")
 
-    del videos[index]
-
-    save_data(videos)
-
-    print("\nVideo removed successfully.")
 
 def exit_app():
     print("\nThanks for using TubeShelf!")
@@ -206,50 +269,51 @@ def exit_app():
 
 
 def main()-> None:
-    # Videos hold a list to store data of each video stored inside of the file.
-    videos = load_data()
+    with closing(sqlite3.connect("tubeshelf.db")) as conn:
 
-    display_welcome()
+        create_database(conn)
 
-    try:
-        while True:
-            display_menu()        
+        display_welcome()
 
-            try:
-                choice = int(input("\nEnter your choice: "))
+        try:
+            while True:
+                display_menu()        
 
-            except ValueError:
-                print("Enter a valid choice(1-6)")
-                continue
+                try:
+                    choice = int(input("\nEnter your choice: "))
+
+                except ValueError:
+                    print("Enter a valid choice(1-6)")
+                    continue
 
 
-            match choice:
-                case 1:
-                    list_all_videos(videos)
+                match choice:
+                    case 1:
+                        list_all_videos(conn)
 
-                case 2:
-                    add_video(videos)
+                    case 2:
+                        add_video(conn)
 
-                case 3:
-                    update_video(videos)
+                    case 3:
+                        update_video(conn)
 
-                case 4:
-                    remove_video(videos)
+                    case 4:
+                        remove_video(conn)
 
-                case 5:
-                    open_video(videos)
+                    case 5:
+                        open_video(conn)
 
-                case 6:
-                    exit_app()
-                    break
-                
-                case _:
-                    print("\nEnter a valid choice(1-6)")
+                    case 6:
+                        exit_app()
+                        break
+                    
+                    case _:
+                        print("\nEnter a valid choice(1-6)")
 
-    except KeyboardInterrupt:
-        print("\n\nEmergency exit initiated.")
-        print("Thanks for using TubeShelf!")
-        print("See you, space cowboy...")
+        except KeyboardInterrupt:
+            print("\n\nEmergency exit initiated.")
+            print("Thanks for using TubeShelf!")
+            print("See you, space cowboy...")
             
 if __name__ == "__main__":
     main()
