@@ -5,6 +5,7 @@ import webbrowser
 from urllib.parse import urlparse
 
 
+
 def create_database(conn: sqlite3.Connection) -> None:
     conn.execute('''
         CREATE TABLE IF NOT EXISTS videos(
