@@ -1,12 +1,11 @@
 import sqlite3
 from contextlib import closing
-
 import json
 import re
 import webbrowser
 from urllib.parse import urlparse
 
-# new
+
 def create_database(conn: sqlite3.Connection) -> None:
     conn.execute('''
         CREATE TABLE IF NOT EXISTS videos(
@@ -105,18 +104,22 @@ def open_video(videos: list[dict[str, str]]) -> None:
 
     webbrowser.open(videos[index]["link"])
 
-def list_all_videos(videos: list[dict[str, str]]) -> None:
+
+# new
+def list_all_videos(conn: sqlite3.Connection) -> None:
     print("\n" + "-" * 70)
+    cursor = conn.execute("SELECT id, name, time, link FROM videos ORDER BY id")
+    videos = cursor.fetchall()
 
     if not videos:
         print('No videos found. Add your first video!')
     else:
-        for index,video in enumerate(videos, start=1):
-            
+        for video_id, name, time, link in videos:
             print(
-                f"{index}. {video['name']}\n"
-                f"   Duration: {video['time']}\n"
-                f"   Link: {video['link']}")
+                    f"{video_id}. {name}\n"
+                    f"   Duration: {time}\n"
+                    f"   Link: {link}"
+                )
 
     print("\n" + '-' * 70)
 
@@ -241,7 +244,7 @@ def main()-> None:
 
                 match choice:
                     case 1:
-                        list_all_videos(videos)
+                        list_all_videos(conn)
 
                     case 2:
                         add_video(videos)
